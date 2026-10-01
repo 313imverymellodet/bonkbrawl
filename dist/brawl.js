@@ -5,7 +5,7 @@
   var qs = new URLSearchParams(location.search);
   var API = qs.get("api") || "https://orbyt-api-production-29f6.up.railway.app";
   var WS_URL = API.replace(/^http/, "ws") + "/brawl";
-  var STAGES = ["RANDOM", "NEON ROOFTOP", "MOONLIT CRYPT", "MOON BASE", "THE PASS"];
+  var STAGES = ["RANDOM", "NEON ROOFTOP", "MOONLIT CRYPT", "MOON BASE", "THE PASS", "HAUNTED HOLLOW"];
   var LEVELS = ["", "EASY", "NORMAL", "HARD"];
   var meName = store("bb_name"), myCh = 0, ws = null, fighting = false, wantJoin = qs.get("brawl"), cfg = { stage: -1, bots: 0, botLv: 2 };
 
@@ -132,7 +132,7 @@
         if (a === "cancel") { sendWs({ t: "leave" }); home(); }
         if (a === "go") sendWs({ t: "go" });
         if (a === "invite") invite(b.getAttribute("data-code"));
-        if (a === "stage") { cfg.stage = cfg.stage >= 3 ? -1 : cfg.stage + 1; sendWs({ t: "config", stage: cfg.stage, bots: cfg.bots, botLv: cfg.botLv }); }
+        if (a === "stage") { cfg.stage = cfg.stage >= STAGES.length - 2 ? -1 : cfg.stage + 1; sendWs({ t: "config", stage: cfg.stage, bots: cfg.bots, botLv: cfg.botLv }); }
         if (a === "bots") { cfg.bots = (cfg.bots + 1) % 4; sendWs({ t: "config", stage: cfg.stage, bots: cfg.bots, botLv: cfg.botLv }); }
         if (a === "lv") { cfg.botLv = cfg.botLv >= 3 ? 1 : cfg.botLv + 1; sendWs({ t: "config", stage: cfg.stage, bots: cfg.bots, botLv: cfg.botLv }); }
       };
