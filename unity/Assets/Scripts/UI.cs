@@ -361,15 +361,18 @@ public class UI : MonoBehaviour
         Txt(prev, "FROM " + def.from, 28, new Vector2(0, .5f), new Vector2(640, -55), Kit.A(Cream, 0.7f), TextAnchor.MiddleLeft, 520);
         Stat(prev, "POWER", Mathf.InverseLerp(80, 124, def.weight), -110);
         Stat(prev, "SPEED", Mathf.InverseLerp(84, 116, def.speed), -150);
-        // roster grid
+        // roster grid: more columns and smaller cells as the cast grows
+        int n = Roster.All.Length, cols = n <= 10 ? 5 : n <= 18 ? 6 : 7;
+        float px = n <= 10 ? 190f : 1010f / cols, cw = px - 12f, py = n <= 10 ? 200f : cw + 14f;
+        float gy = n <= 10 ? -710f : -700f;
         for (int i = 0; i < Roster.All.Length; i++)
         {
             int idx = i;
             var r = Roster.All[i];
             bool sel = i == g.Save.ch, sel2 = twoP && i == g.Save.ch2;
-            var cell = Box(s, new Vector2(.5f, 1), new Vector2((i % 5 - 2) * 190, -710 - (i / 5) * 200), new Vector2(176, 186), sel ? Pink : sel2 ? Cyan : new Color(1, 1, 1, 0.12f), true);
-            Img(cell, Icon(r.id), new Vector2(.5f, .5f), new Vector2(0, 14), new Vector2(150, 150));
-            Txt(cell, r.name, 24, new Vector2(.5f, 0), new Vector2(0, 16), Color.white, TextAnchor.MiddleCenter, 176);
+            var cell = Box(s, new Vector2(.5f, 1), new Vector2((i % cols - (cols - 1) / 2f) * px, gy - (i / cols) * py), new Vector2(cw, cw + 10f), sel ? Pink : sel2 ? Cyan : r.from == "SPOOKTOBER" ? Kit.A(Kit.Hex("#ff7a1a"), 0.22f) : new Color(1, 1, 1, 0.12f), true);
+            Img(cell, Icon(r.id), new Vector2(.5f, .5f), new Vector2(0, cw * 0.08f), new Vector2(cw * 0.85f, cw * 0.85f));
+            Txt(cell, r.name, cw < 170 ? 21 : 24, new Vector2(.5f, 0), new Vector2(0, 16), Color.white, TextAnchor.MiddleCenter, (int)cw);
             var b = cell.gameObject.AddComponent<Button>(); b.targetGraphic = cell.GetComponent<Image>();
             b.onClick.AddListener(() =>
             {
@@ -378,7 +381,7 @@ public class UI : MonoBehaviour
                 g.Save.ch = idx; g.Persist(); ShowSelect(selectMode);
             });
         }
-        float y = -1140;
+        float y = gy - ((n - 1) / cols) * py - cw / 2f - 140f;
         if (twoP)
         {
             Txt(s, "PLAYER 2", 34, new Vector2(.5f, 1), new Vector2(-330, y), Cyan, TextAnchor.MiddleCenter, 300);

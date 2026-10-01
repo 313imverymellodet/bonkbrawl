@@ -14,6 +14,7 @@ public class FighterDef
     public int jump;         // % of base jump
     public int color;        // 0xRRGGBB
     public string cls;       // LIGHT / MEDIUM / HEAVY
+    public bool proc;        // rigid-part model (no skeleton): posed procedurally
 }
 
 public static class Roster
@@ -31,6 +32,12 @@ public static class Roster
         new FighterDef { id = "knight",   name = "SIR BONK", model = "Dungeon/character-human",     from = "NEW!",        weight = 106, speed = 96,  grav = 8, jump = 98,  color = 0x46b8ff, cls = "MEDIUM" },
         new FighterDef { id = "racer",    name = "NITRO",    model = "Mini/character-male-c",       from = "CITY RUSH",   weight = 94,  speed = 108, grav = 8, jump = 102, color = 0xff3d7f, cls = "LIGHT" },
         new FighterDef { id = "ghost",    name = "BOO",      model = "GraveChars/character-ghost",  from = "GRAVE SHIFT", weight = 84,  speed = 102, grav = 6, jump = 110, color = 0xb8e6ff, cls = "LIGHT" },
+        // SPOOKTOBER costume crew (rigid KayKit parts, animated procedurally in FView)
+        new FighterDef { id = "bear",     name = "GRIZZ",    model = "Spooky/character_bear",       from = "SPOOKTOBER",  weight = 118, speed = 90,  grav = 9, jump = 94,  color = 0x8a4a2a, cls = "HEAVY", proc = true },
+        new FighterDef { id = "dog",      name = "BISCUIT",  model = "Spooky/character_dog",        from = "SPOOKTOBER",  weight = 94,  speed = 108, grav = 8, jump = 102, color = 0xd08a4a, cls = "LIGHT", proc = true },
+        new FighterDef { id = "duck",     name = "QUACKERS", model = "Spooky/character_duck",       from = "SPOOKTOBER",  weight = 84,  speed = 104, grav = 6, jump = 112, color = 0xffd23f, cls = "LIGHT", proc = true },
+        new FighterDef { id = "jack",     name = "JACK",     model = "Spooky/character_jack",       from = "SPOOKTOBER",  weight = 100, speed = 100, grav = 8, jump = 100, color = 0xff6a1a, cls = "MEDIUM", proc = true },
+        new FighterDef { id = "witch",    name = "HEXIE",    model = "Spooky/character_witch",      from = "SPOOKTOBER",  weight = 90,  speed = 104, grav = 7, jump = 106, color = 0x8a3cff, cls = "MEDIUM", proc = true },
     };
 }
 
@@ -56,6 +63,8 @@ public static class Stages
             soft = new[] { -9200, -6600, 1300, 6600, 9200, 1300, -1600, 1600, 3000 }, BX = 16500, BT = 13000, BB = -9000, spawn = new[] { -3800, 3800, -7900, 7900 }, gravMinus = 1 },
         new StageDef { id = "kitchen", name = "THE PASS", from = "ORDER UP!", L = -8000, R = 8000, T = 0, B = -3400,
             soft = new[] { -2200, 2200, 3100 }, BX = 16000, BT = 12500, BB = -9000, spawn = new[] { -5000, 5000, -2000, 2000 } },
+        new StageDef { id = "hollow", name = "HAUNTED HOLLOW", from = "SPOOKTOBER", L = -6000, R = 6000, T = 0, B = -3000,
+            soft = new[] { -4700, -1900, 2400, 1900, 4700, 2400, -1300, 1300, 4700 }, BX = 15000, BT = 12000, BB = -8800, spawn = new[] { -4000, 4000, -1500, 1500 } },
     };
 }
 

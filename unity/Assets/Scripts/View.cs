@@ -306,6 +306,13 @@ public class FView
     TrailRenderer trail;
     SpriteRenderer shadow, chargeGlow, ring;
     string clip = "";
+    // rigid costume rig (Spooktober fighters): body parts posed procedurally
+    bool proc;
+    Transform armL, armR, head, hat;
+    Quaternion armL0, armR0, head0, hat0;
+    Vector3 swingL, swingR, raiseL, raiseR, nodHead, nodHat, tiltHead, tiltHat;
+    float sideL = 1f, sideR = -1f, phase, aL, aR, rL, rR, lean, nod, hop;
+    bool tinted;
     public int Slot;
     float yaw, tumble, squash = 1f;
     int lastSt = -1, lastGround = 1;
@@ -322,8 +329,13 @@ public class FView
         spin = new GameObject("spin").transform; spin.SetParent(Root.transform, false);
         var m = Kit.Spawn(def.model, 1.85f, spin);
         model = m.transform;
-        hand = new GameObject("hand").transform; hand.SetParent(model, false);
-        hand.localScale = Vector3.one / Mathf.Max(0.01f, model.localScale.x);   // weapons are sized in metres
+        proc = def.proc;
+        if (proc) ProcRig(m);
+        else
+        {
+            hand = new GameObject("hand").transform; hand.SetParent(model, false);
+            hand.localScale = Vector3.one / Mathf.Max(0.01f, model.localScale.x);   // weapons are sized in metres
+        }
         anim = m.GetComponentInChildren<Animation>();
         if (anim)
         {
@@ -349,6 +361,129 @@ public class FView
         chargeGlow = new GameObject("charge").AddComponent<SpriteRenderer>();
         chargeGlow.sprite = View.Glow; chargeGlow.transform.SetParent(Root.transform, false); chargeGlow.transform.localPosition = new Vector3(0, 0.9f, -0.3f);
         chargeGlow.color = new Color(1, 1, 1, 0);
+    }
+
+    // Finds the arm / head / hat parts of a KayKit costume model and records their rest poses.
+    // Rotation axes are expressed in each part's parent space so they stay correct whatever
+    // axis conversion the FBX import baked into the hierarchy.
+    void ProcRig(GameObject m)
+    {
+        model.localScale = Vector3.one;
+        var b = Kit.WorldBounds(m);
+        model.localScale = Vector3.one * (1.55f / Mathf.Max(0.01f, b.size.y));
+        foreach (var t in m.GetComponentsInChildren<Transform>())
+        {
+            if (t.name.Contains("ArmLeft")) armL = t;
+            else if (t.name.Contains("ArmRight")) armR = t;
+            else if (t.name.EndsWith("Head")) head = t;
+            else if (t.name.EndsWith("Hat")) hat = t;
+        }
+        Vector3 Ax(Transform t, Vector3 modelAxis) => t.parent.InverseTransformDirection(model.TransformDirection(modelAxis)).normalized;
+        if (armL) { armL0 = armL.localRotation; swingL = Ax(armL, Vector3.right); raiseL = Ax(armL, Vector3.forward); sideL = Mathf.Sign(model.InverseTransformPoint(armL.position).x); }
+        if (armR) { armR0 = armR.localRotation; swingR = Ax(armR, Vector3.right); raiseR = Ax(armR, Vector3.forward); sideR = Mathf.Sign(model.InverseTransformPoint(armR.position).x); }
+        if (head) { head0 = head.localRotation; nodHead = Ax(head, Vector3.right); tiltHead = Ax(head, Vector3.forward); }
+        // a hat parented to the head already follows it; a loose one (Jack's pumpkin) is posed the same way
+        if (hat && head && hat.IsChildOf(head)) hat = null;
+        if (hat) { hat0 = hat.localRotation; nodHat = Ax(hat, Vector3.right); tiltHat = Ax(hat, Vector3.forward); }
+        // the weapon hand sits at the end of the leading arm, sized in metres
+        var arm = armR ? armR : model;
+        hand = new GameObject("hand").transform;
+        hand.SetParent(arm, false);
+        hand.position = arm.position + model.TransformVector(new Vector3(0, -0.27f, 0.06f));
+        hand.rotation = model.rotation;
+        hand.localScale = Vector3.one / Mathf.Max(0.001f, arm.lossyScale.x);
+    }
+
+    // Arm swing: negative = forward/up in front, positive = back. Raise: degrees out to the side.
+    void ProcPose(Fighter f, float dt)
+    {
+        float t = Time.time;
+        float wantAL = 0, wantAR = 0, wantRL = 6, wantRR = 6, wantLean = 0, wantNod = 0, wantHop = 0, k = 14f;
+        float tilt = 0;
+        switch (f.st)
+        {
+            case Sim.St_Ground:
+            {
+                float sp = Mathf.Abs(f.vx);
+                if (sp > 20)
+                {
+                    phase += dt * Mathf.Clamp(sp / 90f, 0.7f, 1.6f) * 15f;
+                    float sw = Mathf.Sin(phase);
+                    wantAL = sw * 55f; wantAR = -sw * 55f; wantRL = wantRR = 14f;
+                    wantHop = Mathf.Abs(Mathf.Sin(phase)) * 0.13f;
+                    wantLean = 12f; tilt = Mathf.Sin(phase) * 7f;
+                    k = 30f;
+                }
+                else
+                {
+                    float br = Mathf.Sin(t * 2.6f + Slot);
+                    wantAL = br * 6f; wantAR = -br * 6f; wantRL = wantRR = 8f + br * 3f;
+                    wantHop = 0.015f * (br + 1f); wantNod = br * 4f;
+                }
+                break;
+            }
+            case Sim.St_Land: wantRL = wantRR = 35f; wantLean = 10f; wantNod = 10f; k = 30f; break;
+            case Sim.St_Air:
+            case Sim.St_Spawn:
+                if (f.vy > 0) { wantAL = wantAR = -40f; wantRL = wantRR = 60f; wantLean = -6f; wantNod = -10f; }
+                else { float fl = Mathf.Sin(t * 16f); wantAL = -20f + fl * 25f; wantAR = -20f - fl * 25f; wantRL = wantRR = 110f; wantNod = -6f; }
+                break;
+            case Sim.St_Hitstun:
+            {
+                float fl = Mathf.Sin(t * 30f);
+                wantAL = fl * 60f; wantAR = -fl * 60f; wantRL = wantRR = 140f; wantNod = -20f; wantLean = -18f; tilt = fl * 12f; k = 40f;
+                break;
+            }
+            case Sim.St_Dodge: wantAL = wantAR = 30f; wantRL = wantRR = 10f; wantLean = -14f; wantNod = 14f; k = 30f; break;
+            case Sim.St_Attack:
+            {
+                var m = Moves.Get(f.weapon, f.move < 0 ? 0 : f.move);
+                // 0 wind-up .. 1 strike .. 2 recovered
+                float u = f.moveT < m.startup ? f.moveT / (float)Mathf.Max(1, m.startup)
+                    : f.moveT < m.startup + m.active ? 1f
+                    : 1f + (f.moveT - m.startup - m.active) / (float)Mathf.Max(1, m.total - m.startup - m.active);
+                float strike = u < 1f ? u * u : 1f - Mathf.Clamp01((u - 1f) * 1.4f);
+                float wind = u < 1f ? Mathf.Sin(u * Mathf.PI) : 0f;
+                bool melee = f.weapon == global::Weapon.Sword || f.weapon == global::Weapon.Spear || f.weapon == global::Weapon.Pan;
+                bool gun = f.weapon == global::Weapon.Blaster || f.weapon == global::Weapon.Grenade;
+                k = 60f;
+                if (gun) { wantAR = -90f; wantAL = 10f; wantLean = u < 1f ? 0f : -8f * strike; }
+                else if (m.anim == 3)      // spin: arms flung out
+                { wantRL = wantRR = 85f; wantAL = wantAR = -10f; }
+                else if (m.anim == 1 || m.anim == 2)   // kicks become a body slam / headbutt
+                {
+                    wantLean = Mathf.Lerp(-14f * wind, 34f, strike); wantNod = 26f * strike;
+                    wantAL = wantAR = Mathf.Lerp(-30f * wind, 50f, strike); wantRL = wantRR = 30f;
+                    if (m.hy < 400) { wantLean = 18f * strike; wantHop = -0.05f * strike; wantRL = wantRR = 70f * strike + 10f; }
+                }
+                else if (melee)            // overhead chop
+                {
+                    wantAR = u < 1f ? Mathf.Lerp(-20f, -170f, Mathf.Sin(u * Mathf.PI * 0.5f)) : Mathf.Lerp(-150f, -40f, Mathf.Clamp01((u - 1f) * 3f + 0.6f));
+                    if (f.moveT >= m.startup && f.moveT < m.startup + m.active) wantAR = -45f;
+                    wantAL = 25f; wantRR = 12f; wantLean = Mathf.Lerp(-8f * wind, 16f, strike); wantNod = 10f * strike;
+                }
+                else if (m.hy > 1100)      // uppercut / up attacks: both arms thrust up
+                { wantAL = wantAR = Mathf.Lerp(20f * wind, -175f, strike); wantRL = wantRR = 20f; wantNod = -18f * strike; wantLean = -6f * strike; }
+                else                       // punch with the leading arm
+                {
+                    wantAR = Mathf.Lerp(35f * wind, -95f, strike); wantAL = Mathf.Lerp(-10f * wind, 30f, strike);
+                    wantRR = 8f; wantLean = Mathf.Lerp(-6f * wind, 18f, strike); wantNod = 8f * strike;
+                }
+                if (m.anim == 3 && f.moveT >= m.startup && f.moveT < m.startup + m.active + 4) tumble += dt * 1500f * -f.face;
+                break;
+            }
+        }
+        float a = 1f - Mathf.Exp(-dt * k);
+        aL = Mathf.Lerp(aL, wantAL, a); aR = Mathf.Lerp(aR, wantAR, a);
+        rL = Mathf.Lerp(rL, wantRL, a); rR = Mathf.Lerp(rR, wantRR, a);
+        lean = Mathf.Lerp(lean, wantLean, a); nod = Mathf.Lerp(nod, wantNod, a);
+        hop = Mathf.Lerp(hop, wantHop, 1f - Mathf.Exp(-dt * 40f));
+        if (armL) armL.localRotation = Quaternion.AngleAxis(aL, swingL) * Quaternion.AngleAxis(rL * sideL, raiseL) * armL0;
+        if (armR) armR.localRotation = Quaternion.AngleAxis(aR, swingR) * Quaternion.AngleAxis(rR * sideR, raiseR) * armR0;
+        if (head) head.localRotation = Quaternion.AngleAxis(nod, nodHead) * Quaternion.AngleAxis(tilt * 0.6f, tiltHead) * head0;
+        if (hat) hat.localRotation = Quaternion.AngleAxis(nod, nodHat) * Quaternion.AngleAxis(tilt * 0.6f, tiltHat) * hat0;
+        model.localPosition = new Vector3(0, hop, 0);
+        model.localRotation = Quaternion.Euler(0, yaw, 0) * Quaternion.Euler(lean, 0, tilt);
     }
 
     public void Destroy() { Object.Destroy(Root); Object.Destroy(shadow.gameObject); Object.Destroy(ring.gameObject); }
@@ -405,8 +540,19 @@ public class FView
         bool blink = (f.iframes > 0 && f.st != Sim.St_Dodge && (Time.frameCount / 3) % 2 == 0);
         bool ghost = f.st == Sim.St_Dodge;
         var tint = ghost ? new Color(0.6f, 0.85f, 1.6f) : new Color(boost, boost, boost);
-        mpb.SetColor(ColorId, tint);
-        foreach (var r in rends) { r.SetPropertyBlock(mpb); r.enabled = !blink; }
+        if (proc && !ghost && f.flash <= 0)
+        {
+            // costume parts are coloured by their materials: a _Color override would turn them white
+            if (tinted) foreach (var r in rends) r.SetPropertyBlock(null);
+            tinted = false;
+            foreach (var r in rends) r.enabled = !blink;
+        }
+        else
+        {
+            mpb.SetColor(ColorId, tint);
+            foreach (var r in rends) { r.SetPropertyBlock(mpb); r.enabled = !blink; }
+            tinted = true;
+        }
 
         // charge glow
         if (f.st == Sim.St_Attack && f.charge > 0 && f.move >= 0 && f.moveT <= 1)
@@ -447,6 +593,7 @@ public class FView
 
     void Pose(Fighter f, float dt)
     {
+        if (proc) { ProcPose(f, dt); return; }
         switch (f.st)
         {
             case Sim.St_Ground:
@@ -496,6 +643,14 @@ public class FView
             if (m.anim == 1 || m.anim == 2) angle = 20f;
         }
         else if (f.weapon == global::Weapon.Blaster) angle = 90f;
+        if (proc)
+        {
+            bool gun = f.weapon == global::Weapon.Blaster || f.weapon == global::Weapon.Grenade;
+            weapon.transform.localPosition = Vector3.zero;
+            // hanging arm: blade points forward; raised overhead it points back over the shoulder
+            weapon.transform.localRotation = gun ? Quaternion.identity : Quaternion.Euler(80f, 0, 0);
+            return;
+        }
         weapon.transform.localPosition = new Vector3(0.36f, 0.66f, 0.12f);
         weapon.transform.localRotation = Quaternion.Euler(angle, 0, 0) * (f.weapon == global::Weapon.Blaster ? Quaternion.Euler(-90, 0, 0) : Quaternion.identity);
     }

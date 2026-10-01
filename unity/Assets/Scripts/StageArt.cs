@@ -15,6 +15,7 @@ public static class StageArt
             case "rooftop": Rooftop(sd, L, R, T, B, cam, sun); break;
             case "graveyard": Graveyard(sd, L, R, T, B, cam, sun); break;
             case "moonbase": Moonbase(sd, L, R, T, B, cam, sun); break;
+            case "hollow": Hollow(sd, L, R, T, B, cam, sun); break;
             default: Kitchen(sd, L, R, T, B, cam, sun); break;
         }
     }
@@ -204,6 +205,80 @@ public static class StageArt
         var rng = new System.Random(11);
         for (int i = 0; i < 28; i++)
             Prop(rng.Next(3) == 0 ? "Graveyard/pine-crooked" : "Graveyard/pine", 6f + (float)rng.NextDouble() * 6f, new Vector3(-55f + i * 4f, -5f, 20f + (float)rng.NextDouble() * 22f), rng.Next(360));
+    }
+
+    // ---------------------------------------------------------------- HAUNTED HOLLOW (Spooktober)
+    static void TopAt(GameObject go, float y)
+    {
+        var b = Kit.WorldBounds(go);
+        go.transform.position += new Vector3(0, y - b.max.y, 0);
+    }
+
+    static void Hollow(StageDef sd, float L, float R, float T, float B, Camera cam, Light sun)
+    {
+        Sky(Kit.Hex("#14062b"), Kit.Hex("#6a2c55"), cam);
+        // a fat harvest moon
+        GlowSprite(new Vector3(14f, 15f, 58f), 13f, Kit.Hex("#ffb35a"));
+        GlowSprite(new Vector3(14f, 15f, 59f), 38f, new Color(1f, 0.55f, 0.2f, 0.35f));
+        Stars(70, 66f, Kit.Hex("#ffd9f0"), 31);
+        Light(sun, Kit.Hex("#ffc89a"), 0.9f, new Vector3(38, -35, 0), Kit.Hex("#6a4a8a"), Kit.Hex("#4a2f4f"), Kit.Hex("#1f1420"), Kit.Hex("#2a1238"), 26f, 85f);
+
+        // the hill: soil block under a row of graveyard tiles
+        var soil = Mat(Kit.Hex("#3b2433"), 0.05f, Kit.Noise(64, Kit.Hex("#3b2433"), Kit.Hex("#2a1824"), 0.1f, 2, 4));
+        Box("soil", new Vector3((L + R) / 2, (T + B) / 2 - 0.3f, 0), new Vector3(R - L, T - B - 0.6f, 2.9f), soil);
+        float tw = (R - L) / 4f;
+        for (int i = 0; i < 4; i++)
+        {
+            var tile = Prop("Spooky/tileLarge_graveyard", tw, new Vector3(L + tw * (i + 0.5f), T, 0), i * 90, true);
+            TopAt(tile, T);
+        }
+        Box("rim", new Vector3((L + R) / 2, T - 0.05f, -1.47f), new Vector3(R - L, 0.1f, 0.06f), Mat(Color.black, 0.3f, null, Kit.Hex("#ff7a1a") * 1.6f), false);
+        GlowSprite(new Vector3((L + R) / 2, B - 0.5f, 0), 9f, new Color(0.6f, 0.2f, 1f, 0.45f), 2);
+
+        // floating plank platforms, lit by jack-o'-lanterns
+        Softs(sd, Mat(Kit.Hex("#5a3424"), 0.1f), Mat(Color.black, 0.4f, null, Kit.Hex("#ff8a2a") * 1.8f), 0.3f, 1.7f);
+        for (int k = 0; k < sd.soft.Length; k += 3)
+        {
+            float x0 = sd.soft[k] / 1000f, x1 = sd.soft[k + 1] / 1000f, y = sd.soft[k + 2] / 1000f;
+            Prop("Spooky/jackolantern_small", 0.5f, new Vector3(x0 + 0.35f, y, 0.55f), 170);
+            GlowSprite(new Vector3(x0 + 0.35f, y + 0.3f, 0.3f), 1.6f, new Color(1f, 0.55f, 0.15f, 0.6f), 1);
+            GlowSprite(new Vector3((x0 + x1) / 2, y - 0.6f, 0), 2.6f, new Color(1f, 0.45f, 0.1f, 0.45f), 2);
+        }
+
+        // set dressing along the back of the hill (z > 0 keeps it behind the fighters)
+        Prop("Spooky/shrine", 2.0f, new Vector3(0.6f, T, 1.25f), 180);
+        Prop("Spooky/cauldron", 0.9f, new Vector3(L + 1.4f, T, 0.9f), 200);
+        GlowSprite(new Vector3(L + 1.4f, T + 0.9f, 0.6f), 2.4f, new Color(0.4f, 1f, 0.3f, 0.6f), 1);
+        Prop("Spooky/candyBucket", 0.55f, new Vector3(L + 2.4f, T, 1.0f), 170);
+        Prop("Spooky/jackolantern_big", 0.85f, new Vector3(R - 1.6f, T, 0.95f), 190);
+        GlowSprite(new Vector3(R - 1.6f, T + 0.45f, 0.5f), 2.4f, new Color(1f, 0.55f, 0.15f, 0.65f), 1);
+        Prop("Spooky/pumpkinLarge", 0.6f, new Vector3(R - 2.6f, T, 1.15f), 30);
+        Prop("Spooky/pumpkinSmall", 0.4f, new Vector3(-2.3f, T, 1.2f), 80);
+        Prop("Spooky/candleBundle", 0.45f, new Vector3(1.6f, T, 1.15f), 0);
+        GlowSprite(new Vector3(1.6f, T + 0.5f, 0.9f), 1.2f, new Color(1f, 0.8f, 0.4f, 0.6f), 1);
+        Prop("Spooky/gravestone", 1.0f, new Vector3(-3.4f, T, 1.2f), 185);
+        Prop("Spooky/gravestone", 0.85f, new Vector3(3.3f, T, 1.25f), 172);
+        Prop("Spooky/coffinA_bottom", 0.55f, new Vector3(-4.6f, T, 1.15f), 95);
+        Prop("Spooky/lampPost", 3.0f, new Vector3(L + 0.4f, T, 1.25f), 180);
+        GlowSprite(new Vector3(L + 0.4f, T + 2.8f, 1f), 3f, new Color(1f, 0.75f, 0.4f, 0.6f), 1);
+        Prop("Spooky/lampPost", 3.0f, new Vector3(R - 0.4f, T, 1.25f), 180);
+        GlowSprite(new Vector3(R - 0.4f, T + 2.8f, 1f), 3f, new Color(1f, 0.75f, 0.4f, 0.6f), 1);
+
+        // the hollow: crooked trees, stray graves and lanterns fading into fog
+        var rng = new System.Random(23);
+        string[] trees = { "Spooky/treeA_graveyard", "Spooky/treeB_graveyard", "Spooky/treeC_graveyard", "Spooky/treeD_graveyard" };
+        for (int i = 0; i < 26; i++)
+            Prop(trees[rng.Next(trees.Length)], 5f + (float)rng.NextDouble() * 6f, new Vector3(-52f + i * 4f, -6f, 16f + (float)rng.NextDouble() * 24f), rng.Next(360));
+        for (int i = 0; i < 10; i++)
+        {
+            var at = new Vector3(-30f + i * 6.5f + (float)rng.NextDouble() * 2f, -5.5f, 12f + (float)rng.NextDouble() * 6f);
+            Prop("Spooky/jackolantern_big", 1.4f, at, 160 + rng.Next(40));
+            GlowSprite(at + new Vector3(0, 0.8f, -0.6f), 4f, new Color(1f, 0.5f, 0.12f, 0.5f), -4);
+        }
+        var ground = Kit.MeshObject("hollow-ground", Kit.BuildQuad(1f, 1f));
+        ground.transform.SetParent(root, false); ground.transform.localPosition = new Vector3(0, -6f, 40f); ground.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        ground.transform.localScale = new Vector3(200f, 80f, 1f);
+        ground.GetComponent<MeshRenderer>().sharedMaterial = Mat(Kit.Hex("#140a18"), 0.02f);
     }
 
     // ---------------------------------------------------------------- MOON BASE (Space Diner)
