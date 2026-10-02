@@ -50,7 +50,7 @@ public class UI : MonoBehaviour
         BuildTouch();
         screens = Fill("screens", root);
         bigText = Txt(root, "", 250, new Vector2(.5f, .6f), Vector2.zero, Cream, TextAnchor.MiddleCenter, 1600);
-        bigText.fontStyle = FontStyle.BoldAndItalic; Outline(bigText, 8); bigText.gameObject.SetActive(false);
+        bigText.fontStyle = FontStyle.Italic; Outline(bigText, 8); bigText.gameObject.SetActive(false);
         toastText = Txt(root, "", 40, new Vector2(.5f, 1), new Vector2(0, -300), Cream, TextAnchor.MiddleCenter, 1400);
         Outline(toastText, 3); toastText.gameObject.SetActive(false);
     }
@@ -83,9 +83,10 @@ public class UI : MonoBehaviour
     }
     Text Txt(Transform p, string s, int size, Vector2 anchor, Vector2 pos, Color c, TextAnchor align = TextAnchor.MiddleCenter, float w = 700)
     {
+        size = Mathf.Max(size, 28);   // readable floor (the fighter grid labels are the tightest fit at 21-24)
         var rt = Rect("txt", p, anchor, pos, new Vector2(w, size * 1.4f));
         var t = rt.gameObject.AddComponent<Text>();
-        t.font = F; t.fontSize = size; t.fontStyle = FontStyle.Bold; t.alignment = align; t.color = c; t.text = s;
+        t.font = F; t.fontSize = size; t.fontStyle = FontStyle.Normal; t.alignment = align; t.color = c; t.text = s;
         t.raycastTarget = false; t.horizontalOverflow = HorizontalWrapMode.Overflow; t.verticalOverflow = VerticalWrapMode.Overflow;
         return t;
     }
@@ -96,8 +97,9 @@ public class UI : MonoBehaviour
         var rt = Box(p, anchor, pos, size, bg, true);
         var b = rt.gameObject.AddComponent<Button>(); b.targetGraphic = rt.GetComponent<Image>();
         b.onClick.AddListener(() => { Sfx.I.Click(); onClick(); });
+        rt.gameObject.AddComponent<Press>().Sink = 9;   // the face drops onto its shadow
         var t = Txt(rt, label, fs, new Vector2(.5f, .5f), Vector2.zero, fg, TextAnchor.MiddleCenter, size.x);
-        t.fontStyle = FontStyle.BoldAndItalic;
+        t.fontStyle = FontStyle.Italic;
         return b;
     }
 
@@ -112,7 +114,7 @@ public class UI : MonoBehaviour
             c.ring = Img(c.rt, disc, new Vector2(0, .5f), new Vector2(62, 8), new Vector2(104, 104));
             c.face = Img(c.rt, null, new Vector2(0, .5f), new Vector2(62, 12), new Vector2(110, 110));
             c.pct = Txt(c.rt, "0%", 64, new Vector2(1, .5f), new Vector2(-72, 18), Color.white, TextAnchor.MiddleCenter, 150);
-            c.pct.fontStyle = FontStyle.BoldAndItalic; Outline(c.pct, 3);
+            c.pct.fontStyle = FontStyle.Italic; Outline(c.pct, 3);
             c.name = Txt(c.rt, "", 22, new Vector2(.5f, 0), new Vector2(0, 16), Cream, TextAnchor.MiddleCenter, 240);
             Outline(c.name, 2);
             for (int k = 0; k < 5; k++) { c.stocks[k] = Img(c.rt, disc, new Vector2(1, .5f), new Vector2(-122 + k * 26, -30), new Vector2(20, 20)); }
@@ -282,7 +284,7 @@ public class UI : MonoBehaviour
     IEnumerator FloatCo(Vector3 world, string s, Color c, float scale)
     {
         var t = Txt(floats, s, Mathf.RoundToInt(56 * scale), Vector2.zero, Vector2.zero, c, TextAnchor.MiddleCenter, 800);
-        t.fontStyle = FontStyle.BoldAndItalic; Outline(t, 4);
+        t.fontStyle = FontStyle.Italic; Outline(t, 4);
         float k = 0; float rot = UnityEngine.Random.Range(-12f, 12f);
         while (k < 1f)
         {
@@ -319,10 +321,10 @@ public class UI : MonoBehaviour
     Text Logo(Transform p, float y, int size)
     {
         var holder = Rect("logo", p, new Vector2(.5f, 1), new Vector2(0, y), new Vector2(1200, size * 2.2f));
-        var a = Txt(holder, "BONK", size, new Vector2(.5f, .5f), new Vector2(-8, size * 0.5f - 8), Kit.Hex("#7a1238"), TextAnchor.MiddleCenter, 1200); a.fontStyle = FontStyle.BoldAndItalic;
-        var b = Txt(holder, "BONK", size, new Vector2(.5f, .5f), new Vector2(0, size * 0.5f), Gold, TextAnchor.MiddleCenter, 1200); b.fontStyle = FontStyle.BoldAndItalic; Outline(b, 6);
-        var c = Txt(holder, "BRAWL", size, new Vector2(.5f, .5f), new Vector2(-8, -size * 0.45f - 8), Kit.Hex("#1a1060"), TextAnchor.MiddleCenter, 1200); c.fontStyle = FontStyle.BoldAndItalic;
-        var d = Txt(holder, "BRAWL", size, new Vector2(.5f, .5f), new Vector2(0, -size * 0.45f), Pink, TextAnchor.MiddleCenter, 1200); d.fontStyle = FontStyle.BoldAndItalic; Outline(d, 6);
+        var a = Txt(holder, "BONK", size, new Vector2(.5f, .5f), new Vector2(-8, size * 0.5f - 8), Kit.Hex("#7a1238"), TextAnchor.MiddleCenter, 1200); a.fontStyle = FontStyle.Italic;
+        var b = Txt(holder, "BONK", size, new Vector2(.5f, .5f), new Vector2(0, size * 0.5f), Gold, TextAnchor.MiddleCenter, 1200); b.fontStyle = FontStyle.Italic; Outline(b, 6);
+        var c = Txt(holder, "BRAWL", size, new Vector2(.5f, .5f), new Vector2(-8, -size * 0.45f - 8), Kit.Hex("#1a1060"), TextAnchor.MiddleCenter, 1200); c.fontStyle = FontStyle.Italic;
+        var d = Txt(holder, "BRAWL", size, new Vector2(.5f, .5f), new Vector2(0, -size * 0.45f), Pink, TextAnchor.MiddleCenter, 1200); d.fontStyle = FontStyle.Italic; Outline(d, 6);
         StartCoroutine(Wobble(holder, 3f));
         return b;
     }
@@ -351,12 +353,12 @@ public class UI : MonoBehaviour
         var s = Screen(true, 0.8f);
         var g = Game.I;
         bool twoP = mode == "2p";
-        Txt(s, twoP ? "PLAYER 1  -  CHOOSE" : "CHOOSE YOUR FIGHTER", 64, new Vector2(.5f, 1), new Vector2(0, -130), Gold, TextAnchor.MiddleCenter, 1200).fontStyle = FontStyle.BoldAndItalic;
+        Txt(s, twoP ? "PLAYER 1  -  CHOOSE" : "CHOOSE YOUR FIGHTER", 64, new Vector2(.5f, 1), new Vector2(0, -130), Gold, TextAnchor.MiddleCenter, 1200).fontStyle = FontStyle.Italic;
         // big preview
         var def = Roster.All[g.Save.ch];
         var prev = Box(s, new Vector2(.5f, 1), new Vector2(0, -420), new Vector2(940, 400), new Color(1, 1, 1, 0.08f));
         Img(prev, Icon(def.id), new Vector2(0, .5f), new Vector2(210, 0), new Vector2(360, 360));
-        var nm = Txt(prev, def.name, 84, new Vector2(0, .5f), new Vector2(640, 90), Color.white, TextAnchor.MiddleLeft, 520); nm.fontStyle = FontStyle.BoldAndItalic; Outline(nm, 4);
+        var nm = Txt(prev, def.name, 84, new Vector2(0, .5f), new Vector2(640, 90), Color.white, TextAnchor.MiddleLeft, 520); nm.fontStyle = FontStyle.Italic; Outline(nm, 4);
         Txt(prev, def.cls + " FIGHTER", 36, new Vector2(0, .5f), new Vector2(640, 5), def.cls == "HEAVY" ? Kit.Hex("#ff8a3d") : def.cls == "LIGHT" ? Cyan : Lime, TextAnchor.MiddleLeft, 520);
         Txt(prev, "FROM " + def.from, 28, new Vector2(0, .5f), new Vector2(640, -55), Kit.A(Cream, 0.7f), TextAnchor.MiddleLeft, 520);
         Stat(prev, "POWER", Mathf.InverseLerp(80, 124, def.weight), -110);
@@ -426,7 +428,7 @@ public class UI : MonoBehaviour
     public void ShowHowTo()
     {
         var s = Screen(true, 0.88f);
-        Txt(s, "HOW TO BONK", 96, new Vector2(.5f, 1), new Vector2(0, -170), Gold, TextAnchor.MiddleCenter, 1200).fontStyle = FontStyle.BoldAndItalic;
+        Txt(s, "HOW TO BONK", 96, new Vector2(.5f, 1), new Vector2(0, -170), Gold, TextAnchor.MiddleCenter, 1200).fontStyle = FontStyle.Italic;
         (string head, string body)[] rows =
         {
             ("KNOCK THEM OFF", "Hits raise damage %. The higher it gets, the further they fly.\nLaunch rivals past the edge of the screen to take a stock."),
@@ -439,7 +441,7 @@ public class UI : MonoBehaviour
         for (int i = 0; i < rows.Length; i++)
         {
             var row = Box(s, new Vector2(.5f, 1), new Vector2(0, -350 - i * 205), new Vector2(980, 185), new Color(1, 1, 1, 0.08f));
-            Txt(row, rows[i].head, 40, new Vector2(0, 1), new Vector2(490, -38), i % 2 == 0 ? Pink : Cyan, TextAnchor.MiddleCenter, 940).fontStyle = FontStyle.BoldAndItalic;
+            Txt(row, rows[i].head, 40, new Vector2(0, 1), new Vector2(490, -38), i % 2 == 0 ? Pink : Cyan, TextAnchor.MiddleCenter, 940).fontStyle = FontStyle.Italic;
             var t = Txt(row, rows[i].body, 30, new Vector2(0, .5f), new Vector2(490, -22), Cream, TextAnchor.MiddleCenter, 940);
             t.lineSpacing = 1.1f;
             StartCoroutine(Pop(row, 0.05f * i));
@@ -451,13 +453,17 @@ public class UI : MonoBehaviour
         }, 56);
     }
 
+    // window lost focus: pause local matches (online ones keep going)
+    public void PauseIfLocal() { if (Game.I.M == Game.Mode.Local && !Paused && hudOn) TogglePause(); }
+    bool hudOn => pauseBtn && pauseBtn.gameObject.activeInHierarchy;
+
     void TogglePause()
     {
         if (Paused) { CloseScreens(); return; }
         var s = Screen(true, 0.7f);
         bool online = Game.I.M == Game.Mode.Online;
         Paused = !online;
-        Txt(s, online ? "MENU" : "PAUSED", 120, new Vector2(.5f, 1), new Vector2(0, -520), Cream).fontStyle = FontStyle.BoldAndItalic;
+        Txt(s, online ? "MENU" : "PAUSED", 120, new Vector2(.5f, 1), new Vector2(0, -520), Cream).fontStyle = FontStyle.Italic;
         if (online) Txt(s, "The fight goes on while you're here!", 36, new Vector2(.5f, 1), new Vector2(0, -640), Cream);
         Btn(s, "RESUME", new Vector2(.5f, .5f), new Vector2(0, 120), new Vector2(600, 160), Lime, Ink, CloseScreens, 60);
         if (!online) Btn(s, "RESTART", new Vector2(.5f, .5f), new Vector2(0, -70), new Vector2(600, 130), new Color(1, 1, 1, 0.18f), Cream, () => { CloseScreens(); Game.I.Rematch(); }, 46);
@@ -472,7 +478,7 @@ public class UI : MonoBehaviour
         var g = Game.I;
         string title = win < 0 ? "DRAW!" : g.IsLocal(win) ? (g.LocalCount > 1 ? "P" + (win + 1) + " WINS!" : "YOU WIN!") : Roster.All[c.f[win].ch].name + " WINS!";
         var t = Txt(s, title, 130, new Vector2(.5f, 1), new Vector2(0, -250), win >= 0 && g.IsLocal(win) ? Gold : Cream, TextAnchor.MiddleCenter, 1400);
-        t.fontStyle = FontStyle.BoldAndItalic; Outline(t, 6);
+        t.fontStyle = FontStyle.Italic; Outline(t, 6);
         StartCoroutine(Pop(t.rectTransform));
         // placings
         var order = new List<int>();
@@ -482,7 +488,7 @@ public class UI : MonoBehaviour
         {
             int i = order[k]; var f = c.f[i];
             var row = Box(s, new Vector2(.5f, 1), new Vector2(0, -470 - k * 170), new Vector2(960, 150), g.IsLocal(i) ? Kit.A(View.SlotColors[i], 0.45f) : new Color(1, 1, 1, 0.09f));
-            var pl = Txt(row, "#" + Mathf.Max(1, f.place), 64, new Vector2(0, .5f), new Vector2(70, 0), k == 0 ? Gold : Cream, TextAnchor.MiddleCenter, 120); pl.fontStyle = FontStyle.BoldAndItalic;
+            var pl = Txt(row, "#" + Mathf.Max(1, f.place), 64, new Vector2(0, .5f), new Vector2(70, 0), k == 0 ? Gold : Cream, TextAnchor.MiddleCenter, 120); pl.fontStyle = FontStyle.Italic;
             Img(row, Icon(Roster.All[f.ch].id), new Vector2(0, .5f), new Vector2(210, 0), new Vector2(130, 130));
             var nmT = Txt(row, i < names.Length ? names[i] : "", 36, new Vector2(0, .5f), new Vector2(430, 22), Color.white, TextAnchor.MiddleLeft, 240); nmT.horizontalOverflow = HorizontalWrapMode.Wrap; nmT.resizeTextForBestFit = true; nmT.resizeTextMinSize = 20; nmT.resizeTextMaxSize = 36; nmT.rectTransform.sizeDelta = new Vector2(240, 50);
             Txt(row, Roster.All[f.ch].name, 24, new Vector2(0, .5f), new Vector2(430, -28), Kit.A(Cream, 0.7f), TextAnchor.MiddleLeft, 240);

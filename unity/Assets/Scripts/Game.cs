@@ -39,7 +39,7 @@ public class Game : MonoBehaviour
         WebGLInput.captureAllKeyboardInput = false;
 #endif
         var url = Application.absoluteURL;
-        Dev = url.Contains("dev=1"); AutoPlay = url.Contains("bot=1"); AutoDrive = Dev && url.Contains("autodrive=1");
+        Dev = url.Contains("dev=1") && (url.Contains("://localhost") || url.Contains("://127.0.0.1"));   // cheats never on the live site AutoPlay = url.Contains("bot=1"); AutoDrive = Dev && url.Contains("autodrive=1");
         DevCam.Install(Dev);
         var json = PlayerPrefs.GetString("bb_save", "");
         try { Save = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<SaveData>(json); } catch { Save = null; }
@@ -60,6 +60,8 @@ public class Game : MonoBehaviour
         if (Dev) { int k = url.IndexOf("stage="); if (k >= 0 && k + 6 < url.Length && char.IsDigit(url[k + 6])) Save.stage = url[k + 6] - '0'; }
         if (AutoPlay) { Save.bots = 3; StartLocal(false); }
     }
+
+    void OnApplicationFocus(bool f) { if (!f && UI.I) UI.I.PauseIfLocal(); }
 
     public void Persist() { PlayerPrefs.SetString("bb_save", JsonUtility.ToJson(Save)); PlayerPrefs.Save(); }
 
@@ -93,6 +95,7 @@ public class Game : MonoBehaviour
 
     public void StartLocal(bool twoPlayers)
     {
+        WebBridge.Event(twoPlayers ? "fight_local_2p" : "fight_local");
         int humans = twoPlayers ? 2 : 1;
         int n = Mathf.Clamp(humans + Save.bots, 2, 4);
         var chars = new int[n]; var bots = new int[n]; var names = new string[n];
