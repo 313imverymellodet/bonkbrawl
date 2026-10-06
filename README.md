@@ -8,6 +8,14 @@ A party platform fighter for the browser, made in Unity 6 WebGL and hosted on Ve
 - **Rollback netcode is now expected** for fighters (see [GGPO-style browser rollback](https://github.com/genxium/DelayNoMore)). A WebSocket relay is the [2026 default for browser multiplayer](https://app.cinevva.com/guides/multiplayer-browser-game), so there is no WebRTC NAT pain.
 - **Instant browser play is the growth channel.** There's no install, it runs on phones with touch controls, there are invite links, and a share card.
 
+## The hook: HAT STACK
+- Every brawler starts with a party hat. **KO someone and their whole hat stack jumps onto your head** (a self-destruct just loses it); you respawn with one fresh hat.
+- Each hat beyond the first makes you **heavier** (+5 weight, harder to launch) but **slower** (-3% run and air speed), capped at 10 extra.
+- The tallest stack is everyone's target: CPU fighters hunt big towers. When time runs out, stocks decide first, then **the taller stack**, then lower damage.
+- The towers wobble with your movement, stolen hats keep their owner's colour, the HUD shows your stack count, and the results screen ranks everyone's hats.
+- Analytics: `hat_steal` (value = your stack after the steal) and `hats_end`.
+- Online rooms only match clients on the same sim version (`SIMV` in `brawl.js`, `ver` in the server's hello). Bump it whenever `Sim.cs` changes, because two different sims would desync.
+
 ## How to play
 - Hits raise **damage %**, and the higher it is the further a fighter flies. Knock rivals past the edge of the screen to take a **stock**. Last one standing wins.
 - **Attack + direction** gives a different move neutral, sideways, up and down, both on the ground and in the air.
@@ -62,6 +70,8 @@ Dev URL flags (they need `dev=1`):
 - `api=http://localhost:8787`: use a local relay.
 - `fresh=1`: reset your save.
 
-The public `bot=1` flag is an all-CPU attract mode.
+The public `bot=1` flag is an all-CPU attract mode (it was accidentally commented out until the hat-stack update).
+
+`BonkBuild.WebGLDev` makes a development build with full stack traces in `dist-dev/` (gitignored). Serve it with `node tools/serve.mjs 8107 dist-dev`.
 
 Assets: Kenney Mini Characters, Graveyard Kit, Mini Dungeon, Blaster Kit, Food Kit, City Kit, Space Kit and Furniture Kit (all CC0).

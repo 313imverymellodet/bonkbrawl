@@ -18,3 +18,4 @@ probe.txt
 ADMIN_KEY.txt
 node_modules/
 .env
+dist-dev/

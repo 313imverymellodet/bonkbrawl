@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1")), "../dist");
+const root = process.argv[3] ? path.resolve(process.argv[3]) : path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1")), "../dist");
 const port = Number(process.argv[2] || process.env.PORT || 8080);
 const types = {
   ".html": "text/html; charset=utf-8", ".js": "application/javascript", ".json": "application/json",

@@ -5,6 +5,7 @@
   var qs = new URLSearchParams(location.search);
   var API = qs.get("api") || "https://orbyt-api-production-29f6.up.railway.app";
   var WS_URL = API.replace(/^http/, "ws") + "/brawl";
+  var SIMV = 2;   // bump whenever Sim.cs changes: only the same sim version can share a room
   var STAGES = ["RANDOM", "NEON ROOFTOP", "MOONLIT CRYPT", "MOON BASE", "THE PASS", "HAUNTED HOLLOW"];
   var LEVELS = ["", "EASY", "NORMAL", "HARD"];
   var meName = store("bb_name"), myCh = 0, ws = null, fighting = false, wantJoin = qs.get("brawl"), cfg = { stage: -1, bots: 0, botLv: 2 };
@@ -175,12 +176,12 @@
   }
 
   function connect(then) {
-    if (ws && ws.readyState === 1) { sendWs({ t: "hello", name: meName || "BRAWLER", ch: myCh, player: playerId() }); then(); return; }
+    if (ws && ws.readyState === 1) { sendWs({ t: "hello", name: meName || "BRAWLER", ch: myCh, player: playerId(), ver: SIMV }); then(); return; }
     if (ws) try { ws.close(); } catch (e) {}
     view('<div class="spin"></div><p class="sub">Connecting...</p>');
     ws = new WebSocket(WS_URL);
     var opened = false;
-    ws.onopen = function () { opened = true; sendWs({ t: "hello", name: meName || "BRAWLER", ch: myCh, player: playerId() }); then(); };
+    ws.onopen = function () { opened = true; sendWs({ t: "hello", name: meName || "BRAWLER", ch: myCh, player: playerId(), ver: SIMV }); then(); };
     ws.onmessage = function (ev) {
       var d = ev.data;
       // hot path: rollback traffic goes straight to Unity without parsing here

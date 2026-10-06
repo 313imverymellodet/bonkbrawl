@@ -29,6 +29,7 @@ public struct Fighter
     public int jumps, ground, plat, hitstun, iframes, hitstop, dodgeCd, airDodge, recov;
     public int weapon, ammo, respawnT, dropT, hitMask, lastHitter, lastHitT;
     public int kos, falls, dealt, prevIn, curIn, alive, place, ch, bot, botT, botIn, botHold, flash, fastFall, landT, dodgeDur, spawnT, launch;
+    public int hats, hatMax;   // HAT STACK: KO someone and their whole stack jumps onto your head (hatMax = tallest tower this match)
 }
 
 public struct Item { public int kind, x, y, vx, vy, t, owner, thrown, ground; }
@@ -62,7 +63,7 @@ public class SimState
         uint h = 2166136261;
         void H(int v) { unchecked { h = (h ^ (uint)v) * 16777619; } }
         H(frame); H(over); H(winner); H((int)rng);
-        for (int i = 0; i < n; i++) { var a = f[i]; H(a.x); H(a.y); H(a.vx); H(a.vy); H(a.dmg); H(a.stocks); H(a.st); H(a.moveT); H(a.weapon); }
+        for (int i = 0; i < n; i++) { var a = f[i]; H(a.x); H(a.y); H(a.vx); H(a.vy); H(a.dmg); H(a.stocks); H(a.st); H(a.moveT); H(a.weapon); H(a.hats); }
         for (int i = 0; i < MaxI; i++) { H(it[i].kind); H(it[i].x); H(it[i].y); }
         return h;
     }
@@ -75,7 +76,11 @@ public static class Sim
     public const int HalfW = 380, Height = 1300;
     public const int St_Ground = 0, St_Air = 1, St_Attack = 2, St_Hitstun = 3, St_Dodge = 4, St_Dead = 5, St_Spawn = 6, St_Land = 7;
     public const int Ev_Hit = 1, Ev_KO = 2, Ev_Jump = 3, Ev_Land = 4, Ev_Swing = 5, Ev_Dodge = 6, Ev_Pickup = 7, Ev_Throw = 8, Ev_Boom = 9,
-        Ev_Shot = 10, Ev_Spawn = 11, Ev_Item = 12, Ev_Break = 13, Ev_Over = 14, Ev_Go = 15, Ev_Elim = 16;
+        Ev_Shot = 10, Ev_Spawn = 11, Ev_Item = 12, Ev_Break = 13, Ev_Over = 14, Ev_Go = 15, Ev_Elim = 16, Ev_Hat = 17;
+
+    // Hats make you heavier (harder to launch) but slower. Capped so a giant stack is still playable.
+    public static int HatWeight(in Fighter f) => f.hats > 1 ? Math.Min(f.hats - 1, 10) * 5 : 0;
+    public static int HatSlow(in Fighter f) => f.hats > 1 ? Math.Min(f.hats - 1, 10) * 3 : 0;
 
     public static readonly List<Ev> Events = new List<Ev>();
     static void E(SimState s, int type, int a, int b, int x, int y, int v = 0) => Events.Add(new Ev { frame = s.frame, type = type, a = a, b = b, x = x, y = y, v = v });
@@ -93,7 +98,7 @@ public static class Sim
         for (int i = 0; i < s.n; i++)
         {
             ref var a = ref s.f[i];
-            a.ch = chars[i]; a.bot = bots[i]; a.alive = 1; a.stocks = stocks; a.lastHitter = -1;
+            a.ch = chars[i]; a.bot = bots[i]; a.alive = 1; a.stocks = stocks; a.lastHitter = -1; a.hats = 1; a.hatMax = 1;
             a.x = sd.spawn[i]; a.y = sd.T; a.face = a.x < 0 ? 1 : -1; a.st = St_Ground; a.ground = 1; a.plat = 0;
             a.jumps = 2; a.move = -1;
             if (sd.spawn[i] < sd.L || sd.spawn[i] > sd.R) { a.y = Soft(sd, a.x); a.plat = SoftIndex(sd, a.x) + 1; }
@@ -155,7 +160,8 @@ public static class Sim
         if (!live) return;
         a.stT++;
 
-        int run = 108 * d.speed / 100, airSpd = 96 * d.speed / 100, grav = Math.Max(5, d.grav - sd.gravMinus);
+        int slow = 100 - HatSlow(a);
+        int run = 108 * d.speed / 100 * slow / 100, airSpd = 96 * d.speed / 100 * slow / 100, grav = Math.Max(5, d.grav - sd.gravMinus);
         int j1 = 218 * d.jump / 100, j2 = 196 * d.jump / 100;
 
         switch (a.st)
@@ -164,7 +170,7 @@ public static class Sim
                 if (a.respawnT > 0 && --a.respawnT == 0)
                 {
                     a.st = St_Spawn; a.stT = 0; a.x = 0; a.y = sd.T + 6200; a.vx = a.vy = 0; a.dmg = 0; a.iframes = 170; a.spawnT = 130;
-                    a.jumps = 2; a.airDodge = 0; a.recov = 0; a.weapon = 0; a.ground = 0; a.plat = -1;
+                    a.jumps = 2; a.airDodge = 0; a.recov = 0; a.weapon = 0; a.ground = 0; a.plat = -1; a.hats = 1;   // a fresh hat
                     E(s, Ev_Spawn, i, 0, a.x, a.y);
                 }
                 return;
@@ -432,7 +438,7 @@ public static class Sim
         ref var b = ref s.f[j];
         b.dmg = Math.Min(999, b.dmg + dmg);
         int kb = kbBase + b.dmg * grow * 118 / 1000;
-        kb = kb * 100 / Roster.All[b.ch].weight;
+        kb = kb * 100 / (Roster.All[b.ch].weight + HatWeight(b));
         int vx = dir * FM.Cos(angle) * kb / 1024, vy = FM.Sin(angle) * kb / 1024;
         Launch(s, att, j, vx, vy, kb, dmg, weapon, heavy);
     }
@@ -462,7 +468,17 @@ public static class Sim
         ref var a = ref s.f[i];
         E(s, Ev_KO, i, a.lastHitter, a.x, a.y);
         a.stocks--; a.falls++;
-        if (a.lastHitter >= 0 && a.lastHitter != i && s.frame - a.lastHitT < 540) s.f[a.lastHitter].kos++;
+        bool credited = a.lastHitter >= 0 && a.lastHitter != i && s.frame - a.lastHitT < 540;
+        if (credited) s.f[a.lastHitter].kos++;
+        // the whole hat stack jumps to whoever knocked you out (a self-destruct loses it)
+        if (a.hats > 0)
+        {
+            // an attacker who's already been eliminated can't wear them: the stack is lost
+            bool gets = credited && s.f[a.lastHitter].alive == 1;
+            if (gets) { ref var w = ref s.f[a.lastHitter]; w.hats += a.hats; if (w.hats > w.hatMax) w.hatMax = w.hats; }
+            E(s, Ev_Hat, gets ? a.lastHitter : -1, i, a.x, a.y, a.hats);
+            a.hats = 0;
+        }
         a.st = St_Dead; a.stT = 0; a.vx = a.vy = 0; a.weapon = 0; a.lastHitter = -1; a.hitstop = 0; a.launch = 0;
         if (a.stocks <= 0)
         {
@@ -487,7 +503,7 @@ public static class Sim
                 for (int i = 0; i < s.n; i++)
                 {
                     if (s.f[i].alive == 0) continue;
-                    if (last < 0 || s.f[i].stocks > s.f[last].stocks || (s.f[i].stocks == s.f[last].stocks && s.f[i].dmg < s.f[last].dmg)) last = i;
+                    if (last < 0 || Better(s.f[i], s.f[last])) last = i;
                 }
                 // rank the rest
                 for (int p = 2; p <= s.n; p++)
@@ -496,7 +512,7 @@ public static class Sim
                     for (int i = 0; i < s.n; i++)
                     {
                         if (i == last || s.f[i].alive == 0 || s.f[i].place > 0) continue;
-                        if (best < 0 || s.f[i].stocks > s.f[best].stocks || (s.f[i].stocks == s.f[best].stocks && s.f[i].dmg < s.f[best].dmg)) best = i;
+                        if (best < 0 || Better(s.f[i], s.f[best])) best = i;
                     }
                     if (best >= 0) s.f[best].place = p;
                 }
@@ -506,6 +522,9 @@ public static class Sim
             E(s, Ev_Over, last, 0, 0, 0);
         }
     }
+
+    static bool Better(in Fighter a, in Fighter b) =>
+        a.stocks != b.stocks ? a.stocks > b.stocks : a.hats != b.hats ? a.hats > b.hats : a.dmg < b.dmg;
 
     // ------------------------------------------------------------------ weapons + items
     static void ThrowOrPick(SimState s, int i)
@@ -601,7 +620,7 @@ public static class Sim
             dy += 900;   // explosions lift
             int len2 = Math.Max(1, FM.ISqrt((long)dx * dx + (long)dy * dy));
             b.dmg = Math.Min(999, b.dmg + 16);
-            int kb = (96 + b.dmg * 17 / 10) * 100 / Roster.All[b.ch].weight;
+            int kb = (96 + b.dmg * 17 / 10) * 100 / (Roster.All[b.ch].weight + HatWeight(b));
             Launch(s, owner, j, dx * kb / len2, dy * kb / len2, kb, 16, Weapon.Grenade, true);
         }
     }
@@ -660,7 +679,7 @@ public static class Sim
         for (int j = 0; j < s.n; j++)
         {
             if (j == i || s.f[j].alive == 0 || s.f[j].st == St_Dead) continue;
-            int d = FM.Abs(s.f[j].x - a.x) + FM.Abs(s.f[j].y - a.y);
+            int d = FM.Abs(s.f[j].x - a.x) + FM.Abs(s.f[j].y - a.y) - s.f[j].hats * 450;   // tall hat stacks draw a crowd
             if (d < td) { td = d; t = j; }
         }
 

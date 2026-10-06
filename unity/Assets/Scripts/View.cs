@@ -233,7 +233,19 @@ public class View : MonoBehaviour
             case Sim.Ev_Spawn: FX.Pop(p + Vector3.up * 0.8f, RingS, SlotColors[e.a], 3f, 0.5f); Sfx.I.Spawn(); break;
             case Sim.Ev_Item: Sfx.I.ItemDrop(); break;
             case Sim.Ev_Break: FX.Burst(p + Vector3.up, Color.gray, 8, 3f, 0.4f); break;
-            case Sim.Ev_Go: UI.I.Announce("BONK!", Kit.Hex("#ffd23f")); Sfx.I.Go(); break;
+            case Sim.Ev_Go: UI.I.Announce("BONK!", Kit.Hex("#ffd23f")); Sfx.I.Go(); UI.I.Toast("KO THEM TO STEAL THEIR HATS!"); break;
+            case Sim.Ev_Hat:
+            {
+                if (e.a < 0) break;   // self-destruct: the stack is just gone
+                var vf = fv[e.b]; var af = fv[e.a];
+                if (vf != null && af != null) af.StealHats(vf, e.v);
+                var head = af != null ? af.TagPos + Vector3.up * 0.6f : p;
+                UI.I.WorldText(head, e.v > 1 ? "+" + e.v + " HATS!" : "HAT STOLEN!", Kit.Hex("#ffd23f"), e.v > 1 ? 1.2f : 1f);
+                Sfx.I.Pickup();
+                if (IsLocal(e.a)) { WebBridge.Event("hat_steal", s.f[e.a].hats); if (s.f[e.a].hats >= 5) UI.I.Toast("TOWER OF " + s.f[e.a].hats + " HATS - EVERYONE WANTS IT!"); }
+                else if (IsLocal(e.b)) UI.I.Toast(Game.I.NameOf(e.a) + " STOLE YOUR HATS!");
+                break;
+            }
             case Sim.Ev_Elim: UI.I.Toast(Game.I.IsLocal(e.a) && Game.I.LocalCount == 1 ? "YOU'RE OUT! WATCH THE FINISH" : Game.I.NameOf(e.a) + " IS OUT!"); break;
             case Sim.Ev_Over: UI.I.Announce("GAME!", Color.white); Sfx.I.GameSet(); flash = 0.5f; break;
         }
@@ -260,7 +272,7 @@ public class View : MonoBehaviour
             var f = s.f[i];
             if (f.st == Sim.St_Dead || f.alive == 0) continue;
             float x = f.x / 1000f, y = f.y / 1000f;
-            minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x); minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y + 1.4f); n++;
+            minX = Mathf.Min(minX, x); maxX = Mathf.Max(maxX, x); minY = Mathf.Min(minY, y); maxY = Mathf.Max(maxY, y + 1.4f + Mathf.Min(f.hats, 12) * 0.42f); n++;   // keep hat towers in shot
         }
         if (n == 0) { minX = sd.L / 1000f; maxX = sd.R / 1000f; minY = 0; maxY = 3; }
         // always keep a good part of the stage in shot
@@ -316,8 +328,18 @@ public class FView
     public int Slot;
     float yaw, tumble, squash = 1f;
     int lastSt = -1, lastGround = 1;
+    // HAT STACK (view only: the count comes from the sim, colours remember who you stole them from)
+    Transform hatRoot; float hatTop;
+    readonly List<Transform> hatObjs = new List<Transform>();
+    readonly List<float> hatDrop = new List<float>();
+    public readonly List<Color> HatCols = new List<Color>();
+    float wob, wobV, lastX, lastVx;
+    static Mesh coneMesh; static readonly Dictionary<Color, Material> hatMats = new Dictionary<Color, Material>();
+    static Material pomMat;
     static readonly int ColorId = Shader.PropertyToID("_Color");
     public Vector3 Head => Root.transform.position + Vector3.up * 1.6f;
+    // name tags float above the hat tower
+    public Vector3 TagPos => Root.transform.position + Vector3.up * Mathf.Max(1.6f, hatObjs.Count > 0 ? hatTop + 0.5f + hatObjs.Count * 0.4f : 0f);
     public bool Visible => Root.activeSelf;
 
     public FView(Transform parent, int ch, int slot, string name)
@@ -345,6 +367,9 @@ public class FView
                 if (anim[c] != null) anim[c].wrapMode = WrapMode.ClampForever;
             anim.Play("idle");
         }
+        hatTop = Kit.WorldBounds(m).max.y - Root.transform.position.y - 0.08f;
+        hatRoot = new GameObject("hats").transform; hatRoot.SetParent(spin, false);
+        hatRoot.localPosition = new Vector3(0, hatTop, 0);
         rends = m.GetComponentsInChildren<Renderer>();
         foreach (var r in rends) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         var col = View.SlotColors[slot];
@@ -534,6 +559,7 @@ public class FView
 
         Pose(f, dt);
         Weapon(f);
+        Hats(f, dt);
 
         // hit flash / invincibility blink / dodge ghost
         float boost = f.flash > 0 ? 1f + f.flash * 0.25f : 1f;
@@ -580,6 +606,84 @@ public class FView
             ring.transform.position = new Vector3(pos.x, gy + 0.04f, 0.05f);
             ring.transform.localScale = Vector3.one * 1.4f;
         }
+    }
+
+    // A KO hands the victim's whole stack (their colours) to us; new hats drop in from above.
+    public void StealHats(FView from, int n)
+    {
+        for (int k = 0; k < n; k++) HatCols.Add(k < from.HatCols.Count ? from.HatCols[k] : View.SlotColors[from.Slot]);
+    }
+
+    static readonly Color[] HatPalette = { Kit.Hex("#ff4f8b"), Kit.Hex("#35d6ff"), Kit.Hex("#ffd23f"), Kit.Hex("#7cf06b"), Kit.Hex("#a77bff"), Kit.Hex("#ff8a3d") };
+
+    void Hats(Fighter f, float dt)
+    {
+        int want = Mathf.Clamp(f.hats, 0, 40);
+        while (HatCols.Count < want) HatCols.Add(HatCols.Count == 0 ? View.SlotColors[Slot] : HatPalette[HatCols.Count % HatPalette.Length]);
+        if (HatCols.Count > want) HatCols.RemoveRange(want, HatCols.Count - want);
+        while (hatObjs.Count < want) { hatObjs.Add(MakeHat(hatObjs.Count == 0 ? hatRoot : hatObjs[hatObjs.Count - 1], HatCols[hatObjs.Count], hatObjs.Count == 0)); hatDrop.Add(hatObjs.Count == 1 ? 0f : 1f); }
+        while (hatObjs.Count > want) { Object.Destroy(hatObjs[hatObjs.Count - 1].gameObject); hatObjs.RemoveAt(hatObjs.Count - 1); hatDrop.RemoveAt(hatDrop.Count - 1); }
+        // wobble: a spring driven by how hard the fighter accelerates sideways
+        float x = f.x / 1000f;
+        float vx = dt > 0 ? (x - lastX) / dt : 0; lastX = x;
+        float ax = dt > 0 ? Mathf.Clamp((vx - lastVx) / dt, -400f, 400f) : 0; lastVx = vx;
+        wobV += (-70f * wob - 5f * wobV + ax * 0.35f) * dt;
+        wob = Mathf.Clamp(wob + wobV * dt, -22f, 22f);
+        float sway = Mathf.Sin(Time.time * 2.3f + Slot) * (1.2f + hatObjs.Count * 0.25f);
+        for (int k = 0; k < hatObjs.Count; k++)
+        {
+            var h = hatObjs[k];
+            if (hatDrop[k] > 0) hatDrop[k] = Mathf.Max(0, hatDrop[k] - dt * (2.2f - Mathf.Min(1f, k * 0.04f)));
+            float d = hatDrop[k];
+            float stagger = Mathf.Clamp01(d * 1.4f);
+            h.localPosition = new Vector3(0, (k == 0 ? 0 : 0.4f) + stagger * stagger * 3.5f, 0);
+            h.localRotation = Quaternion.Euler(0, 0, -(wob + sway) * (k == 0 ? 0.35f : 0.55f) + d * 160f);
+            h.localScale = Vector3.one;
+        }
+    }
+
+    static Transform MakeHat(Transform parent, Color c, bool first)
+    {
+        if (!coneMesh) coneMesh = Cone(18, 0.3f, 0.62f);
+        if (!hatMats.TryGetValue(c, out var mat))
+        {
+            mat = new Material(Shader.Find("Standard")) { color = c }; mat.SetFloat("_Glossiness", 0.45f);
+            hatMats[c] = mat;
+        }
+        if (!pomMat) { pomMat = new Material(Shader.Find("Standard")) { color = new Color(1f, 0.97f, 0.9f) }; pomMat.SetFloat("_Glossiness", 0.2f); }
+        var go = new GameObject("hat");
+        go.transform.SetParent(parent, false);
+        var cone = Kit.MeshObject("cone", coneMesh); cone.transform.SetParent(go.transform, false);
+        cone.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        var band = Kit.MeshObject("band", Kit.SphereMesh); band.transform.SetParent(go.transform, false);
+        band.transform.localPosition = new Vector3(0, 0.04f, 0); band.transform.localScale = new Vector3(0.64f, 0.1f, 0.64f);
+        band.GetComponent<MeshRenderer>().sharedMaterial = pomMat;
+        var pom = Kit.MeshObject("pom", Kit.SphereMesh); pom.transform.SetParent(go.transform, false);
+        pom.transform.localPosition = new Vector3(0, 0.64f, 0); pom.transform.localScale = Vector3.one * 0.19f;
+        pom.GetComponent<MeshRenderer>().sharedMaterial = pomMat;
+        foreach (var r in go.GetComponentsInChildren<MeshRenderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        return go.transform;
+    }
+
+    static Mesh Cone(int seg, float r, float h)
+    {
+        var v = new List<Vector3>(); var n = new List<Vector3>(); var t = new List<int>();
+        float slope = r / h;
+        for (int i = 0; i <= seg; i++)
+        {
+            float a = i / (float)seg * Mathf.PI * 2f;
+            var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+            var nn = (d + Vector3.up * slope).normalized;
+            v.Add(d * r); n.Add(nn);
+            v.Add(Vector3.up * h); n.Add(nn);
+        }
+        for (int i = 0; i < seg; i++) { int b = i * 2; t.AddRange(new[] { b, b + 1, b + 2, b + 2, b + 1, b + 3 }); }
+        // base
+        int c0 = v.Count; v.Add(Vector3.zero); n.Add(Vector3.down);
+        for (int i = 0; i <= seg; i++) { float a = i / (float)seg * Mathf.PI * 2f; v.Add(new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r); n.Add(Vector3.down); }
+        for (int i = 0; i < seg; i++) t.AddRange(new[] { c0, c0 + 1 + i, c0 + 2 + i });
+        var m = new Mesh(); m.SetVertices(v); m.SetNormals(n); m.SetTriangles(t, 0); m.RecalculateBounds();
+        return m;
     }
 
     static float Floor(StageDef sd, int x, int y)

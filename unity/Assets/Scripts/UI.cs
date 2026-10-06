@@ -22,7 +22,7 @@ public class UI : MonoBehaviour
     bool touchSeen;
 
     // ---- hud
-    class Card { public RectTransform rt; public Text pct, name; public Image face, ring, weapon; public Image[] stocks = new Image[5]; public int lastDmg; public float bump; }
+    class Card { public RectTransform rt; public Text pct, name, hatN; public Image face, ring, weapon, hat; public Image[] stocks = new Image[5]; public int lastDmg, lastHats = 1; public float bump, hatBump; }
     readonly Card[] cards = new Card[4];
     Transform pauseBtn;
     Text bigText, toastText, rankText;
@@ -32,7 +32,29 @@ public class UI : MonoBehaviour
 
     static readonly Dictionary<string, Sprite> icons = new Dictionary<string, Sprite>();
     public static Sprite Icon(string n) { if (!icons.TryGetValue(n, out var s)) icons[n] = s = Resources.Load<Sprite>("Icons/" + n); return s; }
-    static Sprite disc, ring, star, arrowDown;
+    static Sprite disc, ring, star, arrowDown, hatSpr;
+    // a party-hat icon drawn at boot (cone + band + pom-pom)
+    public static Sprite HatSprite
+    {
+        get
+        {
+            if (hatSpr) return hatSpr;
+            int n = 64; var t = new Texture2D(n, n, TextureFormat.RGBA32, false);
+            var px = new Color[n * n];
+            for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
+            {
+                float u = (x + 0.5f) / n - 0.5f, v = (y + 0.5f) / n;
+                Color c = new Color(0, 0, 0, 0);
+                float half = Mathf.Lerp(0.36f, 0f, (v - 0.08f) / 0.76f);
+                if (v > 0.08f && v < 0.84f && Mathf.Abs(u) < half) c = ((int)((v + u * 0.6f) * 9f) % 2 == 0) ? Color.white : new Color(0.82f, 0.82f, 0.86f);
+                if (v > 0.04f && v < 0.16f && Mathf.Abs(u) < 0.4f) c = new Color(1f, 0.97f, 0.88f);
+                if (new Vector2(u, v - 0.86f).magnitude < 0.11f) c = new Color(1f, 0.97f, 0.88f);
+                px[y * n + x] = c;
+            }
+            t.SetPixels(px); t.Apply();
+            return hatSpr = Sprite.Create(t, new Rect(0, 0, n, n), new Vector2(.5f, .5f));
+        }
+    }
 
     public void Init()
     {
@@ -119,6 +141,9 @@ public class UI : MonoBehaviour
             Outline(c.name, 2);
             for (int k = 0; k < 5; k++) { c.stocks[k] = Img(c.rt, disc, new Vector2(1, .5f), new Vector2(-122 + k * 26, -30), new Vector2(20, 20)); }
             c.weapon = Img(c.rt, null, new Vector2(0, 1), new Vector2(108, -14), new Vector2(46, 46));
+            // the hat stack count sits on top of the card like a hat
+            c.hat = Img(c.rt, HatSprite, new Vector2(1, 1), new Vector2(-46, 4), new Vector2(50, 50));
+            c.hatN = Txt(c.rt, "1", 32, new Vector2(1, 1), new Vector2(-6, -8), Color.white, TextAnchor.MiddleCenter, 80); Outline(c.hatN, 3);
             c.rt.gameObject.SetActive(false);
             cards[i] = c;
         }
@@ -213,11 +238,11 @@ public class UI : MonoBehaviour
             if (!on) continue;
             var f = s.f[i];
             var def = Roster.All[f.ch];
-            c.rt.anchoredPosition = new Vector2((i - (s.n - 1) * 0.5f) * spacing * (landscape ? 1.3f : 1f), landscape ? -120 : -95);
+            c.rt.anchoredPosition = new Vector2((i - (s.n - 1) * 0.5f) * spacing * (landscape ? 1.3f : 1f), landscape ? -138 : -108);
             c.rt.sizeDelta = new Vector2(cw, 150);
             float sc = landscape ? 1.3f : s.n >= 4 ? 0.9f : 1f;
             c.rt.localScale = Vector3.one * sc;
-            if (!landscape) c.rt.anchoredPosition = new Vector2((i - (s.n - 1) * 0.5f) * (s.n >= 4 ? 238f : 262f), -95);
+            if (!landscape) c.rt.anchoredPosition = new Vector2((i - (s.n - 1) * 0.5f) * (s.n >= 4 ? 238f : 262f), -108);
             c.pct.fontSize = f.dmg >= 100 ? 54 : 64;
             if (c.face.sprite == null || c.face.sprite.name != def.id) { c.face.sprite = Icon(def.id); }
             c.ring.color = View.SlotColors[i];
@@ -230,6 +255,16 @@ public class UI : MonoBehaviour
             c.pct.rectTransform.anchoredPosition = new Vector2(-72 + (c.bump > 0 ? Mathf.Sin(Time.time * 80f) * 8f * c.bump : 0), 18);
             c.pct.color = dead ? Color.gray : DmgColor(f.dmg);
             for (int k = 0; k < 5; k++) { c.stocks[k].gameObject.SetActive(k < 3); c.stocks[k].color = k < f.stocks ? View.SlotColors[i] : new Color(1, 1, 1, 0.15f); }
+            c.hat.color = View.SlotColors[i];
+            c.hatN.text = f.hats > 1 ? "x" + f.hats : f.hats == 1 ? "" : "";
+            c.hat.gameObject.SetActive(!dead && f.hats > 0);
+            c.hatN.gameObject.SetActive(!dead && f.hats > 1);
+            if (f.hats > c.lastHats) c.hatBump = 1f;
+            c.lastHats = f.hats;
+            c.hatBump = Mathf.Max(0, c.hatBump - Time.unscaledDeltaTime * 2.5f);
+            c.hat.rectTransform.localScale = Vector3.one * (1f + c.hatBump * 0.6f);
+            c.hat.rectTransform.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(Time.time * 30f) * 18f * c.hatBump);
+            c.hatN.color = Color.Lerp(Color.white, Gold, c.hatBump);
             c.weapon.gameObject.SetActive(f.weapon != 0);
             if (f.weapon != 0) c.weapon.sprite = Icon("w" + f.weapon);
             c.face.color = dead ? new Color(1, 1, 1, 0.35f) : Color.white;
@@ -242,7 +277,7 @@ public class UI : MonoBehaviour
             bool vis = fv != null && fv.Visible;
             t.gameObject.SetActive(vis); a.gameObject.SetActive(vis);
             if (!vis) continue;
-            var sp = cam.WorldToScreenPoint(fv.Head);
+            var sp = cam.WorldToScreenPoint(fv.TagPos);
             // off-screen fighters: pin the tag to the edge with the arrow pointing at them
             float m = 70f * canvas.scaleFactor;
             var clamped = new Vector3(Mathf.Clamp(sp.x, m, UnityEngine.Screen.width - m), Mathf.Clamp(sp.y, m, UnityEngine.Screen.height - m * 2.2f), 0);
@@ -312,8 +347,8 @@ public class UI : MonoBehaviour
     {
         r.localScale = Vector3.zero;
         float k = -delay / 0.28f;
-        while (k < 1f) { k += Time.unscaledDeltaTime / 0.28f; r.localScale = Vector3.one * Kit.EaseOutBack(Mathf.Clamp01(k)); yield return null; }
-        r.localScale = Vector3.one;
+        while (k < 1f && r) { k += Time.unscaledDeltaTime / 0.28f; r.localScale = Vector3.one * Kit.EaseOutBack(Mathf.Clamp01(k)); yield return null; }
+        if (r) r.localScale = Vector3.one;   // the screen may have closed mid-pop
     }
     IEnumerator Pulse(Transform t) { while (t) { t.localScale = Vector3.one * (1f + Mathf.Sin(Time.unscaledTime * 4f) * 0.04f); yield return null; } }
     IEnumerator Wobble(Transform t, float amp) { while (t) { t.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(Time.unscaledTime * 2.3f) * amp); yield return null; } }
@@ -335,7 +370,7 @@ public class UI : MonoBehaviour
         var s = Screen(true, 0.35f);
         var g = Game.I;
         Logo(s, -330, 210);
-        var tag = Txt(s, "PARTY PLATFORM FIGHTER  -  ONLINE WITH ROLLBACK", 32, new Vector2(.5f, 1), new Vector2(0, -600), Cream, TextAnchor.MiddleCenter, 1100); Outline(tag, 2);
+        var tag = Txt(s, "KO THEM.  STEAL THEIR HATS.  STACK 'EM SKY-HIGH.", 32, new Vector2(.5f, 1), new Vector2(0, -600), Cream, TextAnchor.MiddleCenter, 1100); Outline(tag, 2);
         var fight = Btn(s, "FIGHT!", new Vector2(.5f, 0), new Vector2(0, 720), new Vector2(680, 190), Pink, Color.white, () => ShowSelect("cpu"), 92);
         StartCoroutine(Pulse(fight.transform));
         Btn(s, "ONLINE", new Vector2(.5f, 0), new Vector2(-175, 525), new Vector2(330, 140), Cyan, Ink, () => ShowSelect("online"), 54);
@@ -431,6 +466,7 @@ public class UI : MonoBehaviour
         Txt(s, "HOW TO BONK", 96, new Vector2(.5f, 1), new Vector2(0, -170), Gold, TextAnchor.MiddleCenter, 1200).fontStyle = FontStyle.Italic;
         (string head, string body)[] rows =
         {
+            ("STEAL THEIR HATS", "KO someone and their whole hat stack jumps onto YOUR head.\nHats make you heavier but slower. Tallest stack wins ties."),
             ("KNOCK THEM OFF", "Hits raise damage %. The higher it gets, the further they fly.\nLaunch rivals past the edge of the screen to take a stock."),
             ("ATTACK + DIRECTION", "Neutral, side, up and down each do something different,\non the ground and in the air."),
             ("HEAVY = SIGNATURE", "Hold HEAVY to charge. UP + HEAVY is your recovery -\nuse it to get back when you're knocked off."),
@@ -440,7 +476,7 @@ public class UI : MonoBehaviour
         };
         for (int i = 0; i < rows.Length; i++)
         {
-            var row = Box(s, new Vector2(.5f, 1), new Vector2(0, -350 - i * 205), new Vector2(980, 185), new Color(1, 1, 1, 0.08f));
+            var row = Box(s, new Vector2(.5f, 1), new Vector2(0, -340 - i * 182), new Vector2(980, 168), new Color(1, 1, 1, 0.08f));
             Txt(row, rows[i].head, 40, new Vector2(0, 1), new Vector2(490, -38), i % 2 == 0 ? Pink : Cyan, TextAnchor.MiddleCenter, 940).fontStyle = FontStyle.Italic;
             var t = Txt(row, rows[i].body, 30, new Vector2(0, .5f), new Vector2(490, -22), Cream, TextAnchor.MiddleCenter, 940);
             t.lineSpacing = 1.1f;
@@ -492,7 +528,10 @@ public class UI : MonoBehaviour
             Img(row, Icon(Roster.All[f.ch].id), new Vector2(0, .5f), new Vector2(210, 0), new Vector2(130, 130));
             var nmT = Txt(row, i < names.Length ? names[i] : "", 36, new Vector2(0, .5f), new Vector2(430, 22), Color.white, TextAnchor.MiddleLeft, 240); nmT.horizontalOverflow = HorizontalWrapMode.Wrap; nmT.resizeTextForBestFit = true; nmT.resizeTextMinSize = 20; nmT.resizeTextMaxSize = 36; nmT.rectTransform.sizeDelta = new Vector2(240, 50);
             Txt(row, Roster.All[f.ch].name, 24, new Vector2(0, .5f), new Vector2(430, -28), Kit.A(Cream, 0.7f), TextAnchor.MiddleLeft, 240);
-            Txt(row, f.kos + " KO  " + f.falls + " FALLS  " + f.dealt + " DMG", 28, new Vector2(1, .5f), new Vector2(-24, 0), Cream, TextAnchor.MiddleRight, 360).rectTransform.pivot = new Vector2(1, .5f);
+            var hi = Img(row, HatSprite, new Vector2(1, .5f), new Vector2(-300, 0), new Vector2(70, 70)); hi.color = View.SlotColors[i];
+            var hn = Txt(row, "x" + f.hatMax, 44, new Vector2(1, .5f), new Vector2(-222, 10), f.hatMax >= 3 ? Gold : Color.white, TextAnchor.MiddleCenter, 100); hn.fontStyle = FontStyle.Italic; Outline(hn, 3);
+            Txt(row, "BEST", 20, new Vector2(1, .5f), new Vector2(-222, -30), Kit.A(Cream, 0.6f), TextAnchor.MiddleCenter, 100);
+            Txt(row, f.kos + " KO\n" + f.dealt + " DMG", 26, new Vector2(1, .5f), new Vector2(-24, 0), Cream, TextAnchor.MiddleRight, 160).rectTransform.pivot = new Vector2(1, .5f);
             StartCoroutine(Pop(row, 0.15f + 0.08f * k));
         }
         rankText = Txt(s, "", 34, new Vector2(.5f, 0), new Vector2(0, 640), Gold, TextAnchor.MiddleCenter, 1000);

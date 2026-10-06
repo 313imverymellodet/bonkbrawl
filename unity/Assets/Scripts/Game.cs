@@ -39,7 +39,8 @@ public class Game : MonoBehaviour
         WebGLInput.captureAllKeyboardInput = false;
 #endif
         var url = Application.absoluteURL;
-        Dev = url.Contains("dev=1") && (url.Contains("://localhost") || url.Contains("://127.0.0.1"));   // cheats never on the live site AutoPlay = url.Contains("bot=1"); AutoDrive = Dev && url.Contains("autodrive=1");
+        Dev = url.Contains("dev=1") && (url.Contains("://localhost") || url.Contains("://127.0.0.1"));   // cheats never on the live site
+        AutoPlay = url.Contains("bot=1"); AutoDrive = Dev && url.Contains("autodrive=1");
         DevCam.Install(Dev);
         var json = PlayerPrefs.GetString("bb_save", "");
         try { Save = string.IsNullOrEmpty(json) ? null : JsonUtility.FromJson<SaveData>(json); } catch { Save = null; }
@@ -185,6 +186,7 @@ public class Game : MonoBehaviour
         Save.played++;
         if (me >= 0 && c.winner == me) Save.won++;
         if (me >= 0) Save.kos += c.f[me].kos;
+        if (me >= 0) WebBridge.Event("hats_end", c.f[me].hatMax);
         Persist();
         if (M == Mode.Online && !reported) { reported = true; WebBridge.NetSend("{\"t\":\"result\",\"w\":" + c.winner + "}"); }
         Sfx.I.Music(false);
@@ -354,6 +356,6 @@ public class Game : MonoBehaviour
         int me = localSlots.Count > 0 ? localSlots[0] : 0;
         var f = c.f[me];
         string res = c.winner == me ? "WON" : "placed #" + Mathf.Max(1, f.place);
-        return "BONK BRAWL: I " + res + " as " + Roster.All[f.ch].name + " on " + Stages.All[c.stage].name + " with " + f.kos + " KOs. Come get bonked!";
+        return "BONK BRAWL: I " + res + " as " + Roster.All[f.ch].name + " with a tower of " + f.hatMax + (f.hatMax == 1 ? " hat" : " hats") + " (" + f.kos + " KOs). Come steal them!";
     }
 }

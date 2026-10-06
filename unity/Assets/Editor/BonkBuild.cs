@@ -66,7 +66,11 @@ public static class BonkBuild
         so.ApplyModifiedProperties();
     }
 
-    public static void WebGL()
+    public static void WebGL() => Build(false);
+    // development build with full stack traces in dist-dev/ (never deployed)
+    public static void WebGLDev() => Build(true);
+
+    static void Build(bool dev)
     {
         EnsureAxes();
         Setup();
@@ -81,7 +85,7 @@ public static class BonkBuild
         PlayerSettings.WebGL.decompressionFallback = true;
         PlayerSettings.WebGL.nameFilesAsHashes = true;
         PlayerSettings.WebGL.dataCaching = true;
-        PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.None;
+        PlayerSettings.WebGL.exceptionSupport = dev ? WebGLExceptionSupport.FullWithStacktrace : WebGLExceptionSupport.None;
         PlayerSettings.WebGL.showDiagnostics = false;
         PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.Medium);
         PlayerSettings.stripEngineCode = true;
@@ -91,14 +95,14 @@ public static class BonkBuild
         QualitySettings.SetQualityLevel(QualitySettings.names.Length - 1, true);
         EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL);
 
-        var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../dist"));
+        var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, dev ? "../../dist-dev" : "../../dist"));
         if (Directory.Exists(outDir)) Directory.Delete(outDir, true);
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
         {
             scenes = new[] { ScenePath },
             locationPathName = outDir,
             target = BuildTarget.WebGL,
-            options = BuildOptions.None,
+            options = dev ? BuildOptions.Development : BuildOptions.None,
         });
         Debug.Log("BONK BUILD RESULT: " + report.summary.result + " size=" + report.summary.totalSize + " errors=" + report.summary.totalErrors);
         if (Application.isBatchMode) EditorApplication.Exit(report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded ? 0 : 1);
